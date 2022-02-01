@@ -1,0 +1,78 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+suppressPackageStartupMessages({
+    library("reticulate")
+    library("ggplot2")
+    library("SingleCellExperiment")
+    library("scater")
+    library("Seurat")
+})
+# load('~/data/chick_miruna/08052021.RData')
+# save just combined to reduce load time from Miruna's entire environment
+# save(combined, file = '~/data/chick_miruna/combined_mgg_08052021.Rdata' )
+load('~/data/chick_miruna/combined_mgg_08052021.Rdata')
+combined
+```
+
+
+```{r}
+sc <- import("scanpy")
+scv <- import("scvelo")
+cr <- import("cellrank")
+np <- import("numpy")
+adata006 = sc$read_h5ad('/Users/mcgaugheyd/data/chick_miruna/M006_adata.h5ad')
+adata006.obs['sample'] = 'WT'
+adata006.obs_names = adata006.obs_names + '-1_1'
+adata007 = sc.read_h5ad('/Users/mcgaugheyd/data/chick_miruna/M007_adata.h5ad')
+adata007.obs['sample'] = 'G15'
+adata007.obs_names = adata007.obs_names + '-1_2'
+adata008 = sc.read_h5ad('/Users/mcgaugheyd/data/chick_miruna/M008_adata.h5ad')
+adata008.obs['sample'] = 'G16'
+adata008.obs_names = adata008.obs_names + '-1_3'
+adata = adata006.concatenate(adata007, adata008, batch_key = 'sample', index_unique = None)
+```
+
+
+# get cell names and cut down to those in Miruna's `combined`
+```{r}
+adata$obs_names
+```
+
+```{python}
+adata.obs
+```
+
+```{python}
+scv.pp.filter_and_normalize(adata, min_shared_counts=20, n_top_genes=2000)
+sc.tl.pca(adata)
+sc.pp.neighbors(adata, n_pcs=30, n_neighbors=30)
+sc.tl.umap(adata)
+scv.pp.moments(adata, n_pcs=None, n_neighbors=None)
+```
+
+
+```{python}
+scv.tl.recover_dynamics(adata, n_jobs=8)
+```
+
+
+```{python}
+scv.tl.velocity(adata, mode="dynamical")
+scv.tl.velocity_graph(adata)
+```
+
+```{python}
+
+scv.pl.velocity_embedding_stream(
+    adata, basis="umap", legend_fontsize=12, title="", smooth=0.8, min_mass=4
+)
+```
+
+
+```{python}
+#cr.tl.terminal_states(adata, cluster_key="clusters", weight_connectivities=0.2)
+```
