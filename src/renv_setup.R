@@ -12,12 +12,13 @@ pkgs <- c(
 )
 
 bioc_pkgs <- c(
-  "SingleCellExperiment",
-  "scater",
-  "multtest"
+  "bioc::SingleCellExperiment",
+  "bioc::scater",
+  "bioc::multtest"
 )
 
 renv::install(pkgs)
+renv::install(bioc_pkgs)
 
 
 py_pkgs <- c(
@@ -31,3 +32,4 @@ py_pkgs <- c(
 reticulate::py_install(py_pkgs)
 
 renv::snapshot()
+remotes::install_github("mojaveazure/seurat-disk")

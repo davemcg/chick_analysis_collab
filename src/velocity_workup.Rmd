@@ -5,11 +5,13 @@ output: html_notebook
 
 ```{r}
 suppressPackageStartupMessages({
+    library("tidyverse")
     library("reticulate")
     library("ggplot2")
     library("SingleCellExperiment")
     library("scater")
     library("Seurat")
+    library("SeuratDisk")
 })
 # load('~/data/chick_miruna/08052021.RData')
 # save just combined to reduce load time from Miruna's entire environment
@@ -18,6 +20,28 @@ load('~/data/chick_miruna/combined_mgg_08052021.Rdata')
 combined
 ```
 
+# Convert h5ad to h5Seurat
+```{r}
+Convert('~/data/chick_miruna/M006_adata.h5ad', dest = "h5seurat", overwrite = TRUE)
+Convert('~/data/chick_miruna/M007_adata.h5ad', dest = "h5seurat", overwrite = TRUE)
+Convert('~/data/chick_miruna/M008_adata.h5ad', dest = "h5seurat", overwrite = TRUE)
+```
+
+# Import in h5Seurat and Merge
+```{r}
+m006 <- LoadH5Seurat('~/data/chick_miruna/M006_adata.h5seurat')
+m007 <- LoadH5Seurat('~/data/chick_miruna/M007_adata.h5seurat')
+m008 <- LoadH5Seurat('~/data/chick_miruna/M008_adata.h5seurat')
+
+m006 <- RenameCells(m006, new.names = paste0(colnames(m006), '-1_1'))
+m007 <- RenameCells(m007, new.names = paste0(colnames(m007), '-1_2'))
+m008 <- RenameCells(m008, new.names = paste0(colnames(m008), '-1_3'))
+
+mAll <- merge(m006, y = c(m007, m008))
+# only retain same cells as miruna
+mAll <- mAll[,colnames(mAll) %in% colnames(combined)]
+# remove cells in combined but not in mAll to facilate pca/umap/HVG transfer
+```
 
 ```{r}
 sc <- import("scanpy")
