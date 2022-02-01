@@ -1,4 +1,4 @@
-cd /data/mcgaugheyd/projects/outside/chick_miruna
+cd /data/mcgaugheyd/projects/outside/chick_MGT
 module load samtools
 module load meme
 bash ~/git/chick_analysis_collab/src/blat_stop_codon.sh M006
