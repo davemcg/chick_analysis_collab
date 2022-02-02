@@ -26,7 +26,8 @@ py_pkgs <- c(
   "python-igraph",
   "louvain",
   "scvelo",
-  "cellrank"
+  "cellrank",
+  'pandas==1.3.5'
 )
 
 reticulate::py_install(py_pkgs)
