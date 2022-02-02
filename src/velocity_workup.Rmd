@@ -34,13 +34,49 @@ m007 <- LoadH5Seurat('~/data/chick_miruna/M007_adata.h5seurat')
 m008 <- LoadH5Seurat('~/data/chick_miruna/M008_adata.h5seurat')
 
 m006 <- RenameCells(m006, new.names = paste0(colnames(m006), '-1_1'))
+m006@meta.data$Sample <- 'M006'
 m007 <- RenameCells(m007, new.names = paste0(colnames(m007), '-1_2'))
+m007@meta.data$Sample <- 'M007'
 m008 <- RenameCells(m008, new.names = paste0(colnames(m008), '-1_3'))
+m008@meta.data$Sample <- 'M008'
 
 mAll <- merge(m006, y = c(m007, m008))
-# only retain same cells as miruna
-mAll <- mAll[,colnames(mAll) %in% colnames(combined)]
 # remove cells in combined but not in mAll to facilate pca/umap/HVG transfer
+cells_between <- colnames(combined)[colnames(combined) %in% colnames(mAll)]
+
+combined_sub <- subset(combined, cells = cells_between)
+mAll <- subset(mAll, cells = cells_between)
+
+
+# copy over PCA and UMAP
+mAll[['integrated']] <- combined_sub[['integrated']]
+mAll[['umap']] <- combined_sub[['umap']]
+pca <- combined_sub@reductions$pca@cell.embeddings
+mAll[['pca']] <- CreateDimReducObject(
+    embeddings = pca,
+    key = 'PC_',
+    assay = 'integrated',
+    global = TRUE
+  )
+
+
+
+
+SaveH5Seurat(mAll, filename = "~/data/chick_miruna/mAll.h5seurat", overwrite = TRUE)
+Convert("~/data/chick_miruna/mAll.h5seurat", dest = "h5ad", overwrite = TRUE)
+
+# make sample specific adata
+m006 <- subset(mAll, Sample == 'M006')
+m007 <- subset(mAll, Sample == 'M007')
+m008 <- subset(mAll, Sample == 'M008')
+
+SaveH5Seurat(m006, filename = "~/data/chick_miruna/m006.h5seurat", overwrite = TRUE)
+SaveH5Seurat(m007, filename = "~/data/chick_miruna/m007.h5seurat", overwrite = TRUE)
+SaveH5Seurat(m008, filename = "~/data/chick_miruna/m008.h5seurat", overwrite = TRUE)
+
+Convert("~/data/chick_miruna/m006.h5seurat", dest = "h5ad", overwrite = TRUE)
+Convert("~/data/chick_miruna/m007.h5seurat", dest = "h5ad", overwrite = TRUE)
+Convert("~/data/chick_miruna/m008.h5seurat", dest = "h5ad", overwrite = TRUE)
 ```
 
 ```{r}
@@ -48,44 +84,34 @@ sc <- import("scanpy")
 scv <- import("scvelo")
 cr <- import("cellrank")
 np <- import("numpy")
-adata006 = sc$read_h5ad('/Users/mcgaugheyd/data/chick_miruna/M006_adata.h5ad')
-adata006.obs['sample'] = 'WT'
-adata006.obs_names = adata006.obs_names + '-1_1'
-adata007 = sc.read_h5ad('/Users/mcgaugheyd/data/chick_miruna/M007_adata.h5ad')
-adata007.obs['sample'] = 'G15'
-adata007.obs_names = adata007.obs_names + '-1_2'
-adata008 = sc.read_h5ad('/Users/mcgaugheyd/data/chick_miruna/M008_adata.h5ad')
-adata008.obs['sample'] = 'G16'
-adata008.obs_names = adata008.obs_names + '-1_3'
-adata = adata006.concatenate(adata007, adata008, batch_key = 'sample', index_unique = None)
+adata = sc$read_h5ad('/Users/mcgaugheyd/data/chick_miruna/m006.h5ad')
+adata
 ```
 
 
-# get cell names and cut down to those in Miruna's `combined`
-```{r}
-adata$obs_names
-```
+
 
 ```{python}
-adata.obs
-```
+import scvelo as scv
+import scanpy as sc
 
-```{python}
+adata = sc.read_h5ad('/Users/mcgaugheyd/data/chick_miruna/m007.h5ad')
 scv.pp.filter_and_normalize(adata, min_shared_counts=20, n_top_genes=2000)
 sc.tl.pca(adata)
 sc.pp.neighbors(adata, n_pcs=30, n_neighbors=30)
-sc.tl.umap(adata)
+# sc.tl.umap(adata)
 scv.pp.moments(adata, n_pcs=None, n_neighbors=None)
 ```
 
 
 ```{python}
-scv.tl.recover_dynamics(adata, n_jobs=8)
+# LOOOONG runtime (30+ minutes with all data)
+scv.tl.recover_dynamics(adata, n_jobs=10)
 ```
 
 
 ```{python}
-scv.tl.velocity(adata, mode="dynamical")
+scv.tl.velocity(adata, mode="dynamical", n_jobs=4)
 scv.tl.velocity_graph(adata)
 ```
 
