@@ -1,0 +1,292 @@
+---
+title: "Miruna GT Chick Trajectory Analysis"
+author: David McGaughey
+date: 2022-02-04
+output: 
+  html_notebook:
+    theme: united
+---
+
+# Date
+2022-02-022
+
+# Rough workflow
+1. Re-quantify with kallisto (as I need the unspliced (intronic) quant)
+2. Take the h5ad objects and re-create with your UMAP view
+3. Run [scVelo](https://scvelo.readthedocs.io) velocity analysis
+4. Make plots and briefly discuss results
+
+# R load
+```{r}
+suppressPackageStartupMessages({
+    library("tidyverse")
+    library("reticulate")
+    library("ggplot2")
+    library("SingleCellExperiment")
+    library("scater")
+    library("Seurat")
+    library("SeuratDisk")
+    library("zellkonverter")
+})
+# load('~/data/chick_miruna/08052021.RData')
+# save just combined to reduce load time from Miruna's entire environment
+# save(combined, file = '~/data/chick_miruna/combined_mgg_08052021.Rdata' )
+load('~/data/chick_miruna/combined_mgg_08052021.Rdata')
+combined
+
+color_palette <- pals::glasbey()[1:14]
+names(color_palette) <- seq(0,13, 1)
+```
+
+# Python load
+```{python}
+import scvelo as scv
+import scanpy as sc
+import cellrank as cr
+```
+
+# Convert kallisto h5ad to h5Seurat
+```{r}
+Convert('~/data/chick_miruna/M006_adata.h5ad', dest = "h5seurat", overwrite = TRUE)
+Convert('~/data/chick_miruna/M007_adata.h5ad', dest = "h5seurat", overwrite = TRUE)
+Convert('~/data/chick_miruna/M008_adata.h5ad', dest = "h5seurat", overwrite = TRUE)
+```
+
+# Import in h5Seurat and bring over MGT info
+```{r}
+m006 <- LoadH5Seurat('~/data/chick_miruna/M006_adata.h5seurat')
+m007 <- LoadH5Seurat('~/data/chick_miruna/M007_adata.h5seurat')
+m008 <- LoadH5Seurat('~/data/chick_miruna/M008_adata.h5seurat')
+
+m006 <- RenameCells(m006, new.names = paste0(colnames(m006), '-1_1'))
+m007 <- RenameCells(m007, new.names = paste0(colnames(m007), '-1_2'))
+m008 <- RenameCells(m008, new.names = paste0(colnames(m008), '-1_3'))
+
+mAll <- merge(m006, y = c(m007, m008))
+# remove cells in combined but not in mAll to facilate pca/umap/HVG transfer
+cells_between <- colnames(combined)[colnames(combined) %in% colnames(mAll)]
+
+combined_sub <- subset(combined, cells = cells_between)
+mAll <- subset(mAll, cells = cells_between)
+
+mAll@meta.data <- combined_sub@meta.data
+
+# copy over PCA and UMAP
+mAll[['integrated']] <- combined_sub[['integrated']]
+mAll[['umap']] <- combined_sub[['umap']]
+pca <- combined_sub@reductions$pca@cell.embeddings
+mAll[['pca']] <- CreateDimReducObject(
+    embeddings = pca,
+    key = 'PC_',
+    assay = 'integrated',
+    global = TRUE
+  )
+
+
+
+
+SaveH5Seurat(mAll, filename = "~/data/chick_miruna/mAll.h5seurat", overwrite = TRUE)
+Convert("~/data/chick_miruna/mAll.h5seurat", dest = "h5ad", overwrite = TRUE)
+
+# make sample specific adata
+m006 <- subset(mAll, cluster.condition == 'Sall1 CTRL_Sall1 CTRL')
+m007 <- subset(mAll, cluster.condition == 'Sall1 KO15_Sall1 KO15')
+m008 <- subset(mAll, cluster.condition == 'Sall1 KO16_Sall1 KO16')
+
+SaveH5Seurat(m006, filename = "~/data/chick_miruna/m006.h5seurat", overwrite = TRUE)
+SaveH5Seurat(m007, filename = "~/data/chick_miruna/m007.h5seurat", overwrite = TRUE)
+SaveH5Seurat(m008, filename = "~/data/chick_miruna/m008.h5seurat", overwrite = TRUE)
+
+Convert("~/data/chick_miruna/m006.h5seurat", dest = "h5ad", overwrite = TRUE)
+Convert("~/data/chick_miruna/m007.h5seurat", dest = "h5ad", overwrite = TRUE)
+Convert("~/data/chick_miruna/m008.h5seurat", dest = "h5ad", overwrite = TRUE)
+```
+
+# Run scVelo
+
+
+```{python}
+def run_scVelo(adata, adata_out, redo_pca):
+    adata = sc.read_h5ad(adata)
+    print(adata)
+    if redo_pca:
+      print("\nRunning HVG and PCA\n")
+      scv.pp.filter_and_normalize(adata, min_shared_counts=20, n_top_genes=10000)
+      sc.tl.pca(adata)
+    sc.pp.neighbors(adata, n_pcs=30, n_neighbors=30)
+    # sc.tl.umap(adata)
+    scv.pp.moments(adata, n_pcs=None, n_neighbors=None)
+    print("Recover dynamics")
+    scv.tl.recover_dynamics(adata, n_jobs=12)
+    scv.tl.velocity(adata, mode="dynamical")
+    scv.tl.velocity_graph(adata, n_jobs=4)
+    # https://github.com/theislab/scvelo/issues/255#issuecomment-739995301
+    adata.__dict__['_raw'].__dict__['_var'] = adata.__dict__['_raw'].__dict__['_var'].rename(columns={'_index': 'features'})
+    adata.write_h5ad(adata_out)
+    return('Done')
+  
+  
+    
+run_scVelo('/Users/mcgaugheyd/data/chick_miruna/m006.h5ad', '/Users/mcgaugheyd/data/chick_miruna/m006_scVelo.h5ad', True)
+run_scVelo('/Users/mcgaugheyd/data/chick_miruna/m007.h5ad', '/Users/mcgaugheyd/data/chick_miruna/m007_scVelo.h5ad', True)
+run_scVelo('/Users/mcgaugheyd/data/chick_miruna/m008.h5ad', '/Users/mcgaugheyd/data/chick_miruna/m008_scVelo.h5ad', True)
+
+```
+
+# Create scVelo Plots
+
+
+```{python}
+scv.set_figure_params()
+color_palette=["#0000FF",  "#FF0000", "#00FF00", "#000033", "#FF00B6", "#005300", "#FFD300", "#009FFF", "#9A4D42", "#00FFBE", "#783FC1", "#1F9698", "#FFACFD", "#B1CC71"]
+# color_palette = {'0': "#0000FF", '1': "#FF0000",'2': "#00FF00",'3': "#000033",'4': "#FF00B6",'5' : "#005300",'6' : "#FFD300",'7' : "#009FFF",'8' : "#9A4D42",'9' : "#00FFBE",'10': "#783FC1",'11': "#1F9698",'12': "#FFACFD",'13' : "#B1CC71"}
+def scVelo_plotting(adata_path, prefix):
+  adata = sc.read_h5ad(adata_path)
+  scv.tl.velocity_embedding(adata, basis="umap")
+  scv.pl.velocity_embedding_stream(adata, basis="umap", legend_fontsize=12,  color='seurat_clusters', save= prefix + '.embedding_stream.png', show = False, dpi = 300, palette=color_palette)
+  scv.pl.velocity(adata, ['SALL1'], show = False, save = prefix + '.SALL1.png', dpi = 300, color ='seurat_clusters',  palette=color_palette)
+  scv.tl.rank_velocity_genes(adata, groupby='seurat_clusters', min_corr=.3)
+  df = scv.DataFrame(adata.uns['rank_velocity_genes']['names'])
+  df.to_csv(prefix + '.rank_velocity.csv')
+  adata.var.to_csv(prefix + '.var.csv')
+  scv.tl.paga(adata, groups='seurat_clusters')
+  scv.pl.paga(adata, basis='umap', size=20, alpha=.3, color = 'seurat_clusters',
+            min_edge_width=2, node_size_scale=1.5, show = False,
+            dpi = 300, save = prefix + '.PAGA.png', palette=color_palette)
+
+scVelo_plotting('/Users/mcgaugheyd/data/chick_miruna/m006_scVelo.h5ad', 'WT')
+scVelo_plotting('/Users/mcgaugheyd/data/chick_miruna/m007_scVelo.h5ad', 'G15')
+scVelo_plotting('/Users/mcgaugheyd/data/chick_miruna/m008_scVelo.h5ad', 'G16')
+```
+
+
+# Recolored your UMAPs
+```{r, fig.width=10, fig.height=3}
+DimPlot(combined, label = TRUE, label.box = TRUE, split.by = 'cluster.condition', pt.size = 1) + scale_color_manual(values = color_palette) + scale_fill_manual(values = alpha(rep('white', 14), 0.9))
+
+DimPlot(combined, split.by = 'cluster.condition',group.by = 'Phase' ) + scale_color_manual(values = pals::brewer.set2(5) %>% unname())
+```
+
+
+# Overall Velocity
+WT, G15, then G16
+
+Velocity is the relationship between unspliced (the "future") and spliced (the "present") mRNA. If there is a higher ratio of unspliced to spliced of a transcript, then presumably in the future the cell will be splicing and using more of the that transcript. Vice versa for higher ratios of spliced / unspliced. By linking nearby cells (graph) and the velocities you can also infer direction. 
+
+
+```{r}
+knitr::include_graphics("figures/scvelo_WT.embedding_stream.png")
+knitr::include_graphics("figures/scvelo_G15.embedding_stream.png")
+knitr::include_graphics("figures/scvelo_G16.embedding_stream.png")
+```
+
+# Diff Velocity
+You can take each cluster and identify genes whose velocity differs between them
+
+```{r}
+velo_table_WT <- read_csv("WT.rank_velocity.csv") %>% pivot_longer(-`...1`) %>% dplyr::rename(Cluster = name, Gene = value) %>% select(-...1) %>% mutate(Sample = 'WT')
+velo_table_G15 <- read_csv("G15.rank_velocity.csv") %>% pivot_longer(-`...1`) %>% dplyr::rename(Cluster = name, Gene = value) %>% select(-...1) %>% mutate(Sample = 'G15')
+velo_table_G16 <- read_csv("G16.rank_velocity.csv") %>% pivot_longer(-`...1`) %>% dplyr::rename(Cluster = name, Gene = value) %>% select(-...1) %>% mutate(Sample = 'G16')
+velo <- bind_rows(velo_table_WT, velo_table_G15, velo_table_G16) %>% unique()
+velo %>% mutate(Cluster = as.integer(Cluster)) %>% group_by(Cluster, Gene) %>% summarise(`Number of Samples with Diff Velocity` = n(), `Samples with Diff Velocity` = paste(Sample, collapse = ', ')) %>% DT::datatable(filter = 'top', options = list(
+  pageLength = 20, autoWidth = TRUE)) 
+```
+
+## Let's look at DPYSL3, which is listed for cluster 2, G15 and G16 (and not WT)
+```{python}
+gene = 'DPYSL3'
+for prefix in ['WT', 'G15','G16']:
+  print(prefix)
+  if prefix == 'WT':
+    file = '/Users/mcgaugheyd/data/chick_miruna/m006_scVelo.h5ad'
+  if prefix == 'G15':
+    file = '/Users/mcgaugheyd/data/chick_miruna/m007_scVelo.h5ad'
+  if prefix == 'G16':
+    file = '/Users/mcgaugheyd/data/chick_miruna/m008_scVelo.h5ad'
+  adata = sc.read_h5ad(file)
+  scv.pl.velocity(adata, [gene], show = False, save = prefix +  '.' + gene + '.png', dpi = 300, color ='seurat_clusters',  palette=color_palette)
+
+```
+### Again UMAP for your reference
+```{r}
+DimPlot(combined, label = TRUE, label.box = TRUE, split.by = 'cluster.condition', pt.size = 1) + scale_color_manual(values = color_palette) + scale_fill_manual(values = alpha(rep('white', 14), 0.9))
+```
+DPLYSL3 velocity drops in cluster 2 in the WT, but is maintained in the G15/G16. We also see reduced velocity in the G15/G16 in the top right branch, while the WT maintains the velocity. 
+
+[DPYSL3 has a role in migration and cell cycle](https://www.pnas.org/content/115/51/E11978)
+
+![](figures/scvelo_WT.DPYSL3.png)
+
+![](figures/scvelo_G15.DPYSL3.png)
+![](figures/scvelo_G16.DPYSL3.png)
+
+
+
+
+
+# SALL1
+WT, G15, then G16
+
+No *huge* differences in velocity characteristics. Quick viz explainer for velocity: 
+![](https://user-images.githubusercontent.com/31883718/80227452-eb822480-864d-11ea-9399-56886c5e2785.gif)
+
+We we see a *negative* velocity of SALL1 in cluster 7 in the WT which is not present in the mutants.
+
+Overall SALL1 velocity (and expression) appears lower in the G15/G16 relative to the WT.
+
+
+```{r}
+knitr::include_graphics("figures/scvelo_WT.SALL1.png")
+knitr::include_graphics("figures/scvelo_G15.SALL1.png")
+knitr::include_graphics("figures/scvelo_G16.SALL1.png")
+```
+
+# WT, then G15, then G16 PAGA Cluster Trajectory Graph
+Relationships between clusters (PAGA algorithm attempts to infer differentiation path)
+
+This will be more informative when the cluster names are swapped out for stuff like "progenitors" and "cones"
+
+This also may be total trash - I can't remember what cluster is doing what...so perhaps these relationships make no sense?
+```{r}
+knitr::include_graphics("figures/scvelo_WT.PAGA.png")
+knitr::include_graphics("figures/scvelo_G15.PAGA.png")
+knitr::include_graphics("figures/scvelo_G16.PAGA.png")
+```
+
+
+<!-- # CellRank (not useful?) -->
+
+
+<!-- ```{python} -->
+<!-- adata = sc.read_h5ad('/Users/mcgaugheyd/data/chick_miruna/m007_scVelo.h5ad') -->
+<!-- cr.tl.terminal_states(adata, cluster_key="seurat_clusters", weight_connectivities=0.4, n_jobs = 1, backend='threading') -->
+<!-- #cr.pl.terminal_states(adata) -->
+
+<!-- cr.tl.initial_states(adata, cluster_key="seurat_clusters", n_jobs = 1, backend='threading') -->
+<!-- #cr.pl.initial_states(adata, discrete=True) -->
+
+<!-- cr.tl.lineages(adata) -->
+<!-- #cr.pl.lineages(adata, same_plot=False) -->
+
+
+<!-- scv.tl.recover_latent_time(adata, root_key="initial_states_probs", end_key="terminal_states_probs") -->
+<!-- scv.tl.paga( -->
+<!--     adata, -->
+<!--     groups="seurat_clusters", -->
+<!--     root_key="initial_states_probs", -->
+<!--     end_key="terminal_states_probs", -->
+<!--     use_time_prior="velocity_pseudotime", -->
+<!-- ) -->
+
+
+<!-- cr.pl.cluster_fates( -->
+<!--     adata, -->
+<!--     mode="paga_pie", -->
+<!--     cluster_key="seurat_clusters", -->
+<!--     basis="umap", -->
+<!--     node_size_scale=5, -->
+<!--     edge_width_scale=1, -->
+<!--     max_edge_width=4, palette=color_palette, dpi = 300, -->
+<!--     title="directed PAGA", show = False, save  = 'pie.test.png' -->
+<!-- ) -->
+<!-- ``` -->

@@ -1,6 +1,6 @@
 renv::init()
 renv::install("reticulate")
-renv::use_python() # 2 (/usr/local/Cellar/python@3.9/3.9.4/bin/python3.9)
+renv::use_python() # 6 (~/git/chick_analysis_collab/renv/python/virtualenvs/renv-python-3.9/bin/python3)
 
 pkgs <- c(
   "renv",
@@ -8,7 +8,9 @@ pkgs <- c(
   "png",
   "ggplot2",
   "BiocManager",
-  "Seurat"
+  "Seurat",
+  "tidyverse",
+  "pals"
 )
 
 bioc_pkgs <- c(
@@ -26,10 +28,15 @@ py_pkgs <- c(
   "python-igraph",
   "louvain",
   "scvelo",
-  "cellrank"
+  "cellrank",
+  'pandas==1.3.5'
 )
 
 reticulate::py_install(py_pkgs)
 
-renv::snapshot()
+# only on github
 remotes::install_github("mojaveazure/seurat-disk")
+# need latest update that fixes import bug
+remotes::install_github('theislab/zellkonverter')
+
+renv::snapshot()
