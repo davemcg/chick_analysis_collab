@@ -120,11 +120,11 @@ def run_scVelo(adata, adata_out, redo_pca):
     scv.tl.recover_dynamics(adata, n_jobs=12)
     scv.tl.velocity(adata, mode="dynamical")
     scv.tl.velocity_graph(adata, n_jobs=4)
+    scv.tl.velocity_embedding(adata, basis="umap")
     # https://github.com/theislab/scvelo/issues/255#issuecomment-739995301
     adata.__dict__['_raw'].__dict__['_var'] = adata.__dict__['_raw'].__dict__['_var'].rename(columns={'_index': 'features'})
     adata.write_h5ad(adata_out)
     return('Done')
-  
   
     
 run_scVelo('/Users/mcgaugheyd/data/chick_miruna/m006.h5ad', '/Users/mcgaugheyd/data/chick_miruna/m006_scVelo.h5ad', True)
@@ -142,7 +142,7 @@ color_palette=["#0000FF",  "#FF0000", "#00FF00", "#000033", "#FF00B6", "#005300"
 # color_palette = {'0': "#0000FF", '1': "#FF0000",'2': "#00FF00",'3': "#000033",'4': "#FF00B6",'5' : "#005300",'6' : "#FFD300",'7' : "#009FFF",'8' : "#9A4D42",'9' : "#00FFBE",'10': "#783FC1",'11': "#1F9698",'12': "#FFACFD",'13' : "#B1CC71"}
 def scVelo_plotting(adata_path, prefix):
   adata = sc.read_h5ad(adata_path)
-  scv.tl.velocity_embedding(adata, basis="umap")
+  #scv.tl.velocity_embedding(adata, basis="umap")
   scv.pl.velocity_embedding_stream(adata, basis="umap", legend_fontsize=12,  color='seurat_clusters', save= prefix + '.embedding_stream.png', show = False, dpi = 300, palette=color_palette)
   scv.pl.velocity(adata, ['SALL1'], show = False, save = prefix + '.SALL1.png', dpi = 300, color ='seurat_clusters',  palette=color_palette)
   scv.tl.rank_velocity_genes(adata, groupby='seurat_clusters', min_corr=.3)
