@@ -1,0 +1,119 @@
+---
+title: "Miruna GT Chick Velocity Custom Plotting"
+author: David McGaughey
+date: 2022-05-16
+output: 
+  html_notebook:
+    theme: united
+---
+
+
+# Extract velo matrices and gene info from adata
+```{bash}
+python3 ../src/pull_velo_info.py
+```
+
+# R load
+```{r}
+suppressPackageStartupMessages({
+  library("tidyverse")
+  library("reticulate")
+  library("ggplot2")
+  library("SingleCellExperiment")
+  library("scater")
+  library("Seurat")
+  library("SeuratDisk")
+  library("zellkonverter")
+})
+# load('~/data/chick_miruna/08052021.RData')
+# save just combined to reduce load time from Miruna's entire environment
+# save(combined, file = '~/data/chick_miruna/combined_mgg_08052021.Rdata' )
+load('~/data/chick_miruna/combined_mgg_08052021.Rdata')
+combined
+
+color_palette <- pals::glasbey()[1:14]
+names(color_palette) <- seq(0,13, 1)
+```
+
+
+# Build Labelled Matrix
+```{r}
+library(tidyverse)
+
+make_velo_bc <- function(prefix = '../data/m008_scVelo'){
+  velo <- read_csv(glue::glue('{prefix}.velo.csv'))
+  gene <- read_csv(glue::glue('{prefix}.velogenes.csv'))
+  
+  gene_idx <- colnames(velo[,-1]) %>% as.integer()
+  colnames(velo)[2:ncol(velo)] <- gene %>% mutate(idx = row_number() - 1) %>% filter(idx %in% gene_idx) %>% pull(1)
+  
+  obs <- read_csv(glue::glue('{prefix}.obs.csv'))
+  
+  bc_velo <- cbind(obs[,1], velo[,-1])
+  colnames(bc_velo)[1] <- 'Barcode'
+  bc_velo
+}
+
+m006_velo <- make_velo_bc('../data/m006_scVelo')
+m007_velo <- make_velo_bc('../data/m007_scVelo')
+m008_velo <- make_velo_bc('../data/m008_scVelo')
+
+velo_pan <- function(gene){
+  m006 <- m006_velo[,c('Barcode', gene)] %>% 
+    left_join(combined@reductions$umap@cell.embeddings %>% as_tibble(rownames = 'Barcode'), by = "Barcode") %>% 
+    left_join(combined@meta.data %>% as_tibble(rownames = 'Barcode') %>% select(Barcode, cluster.condition), by = "Barcode")
+  m007 <- m007_velo[,c('Barcode', gene)] %>% 
+    left_join(combined@reductions$umap@cell.embeddings %>% as_tibble(rownames = 'Barcode'), by = "Barcode") %>% 
+    left_join(combined@meta.data %>% as_tibble(rownames = 'Barcode') %>% select(Barcode, cluster.condition), by = "Barcode")
+  m008 <- m008_velo[,c('Barcode', gene)] %>% 
+    left_join(combined@reductions$umap@cell.embeddings %>% as_tibble(rownames = 'Barcode'), by = "Barcode") %>% 
+    left_join(combined@meta.data %>% as_tibble(rownames = 'Barcode') %>% select(Barcode, cluster.condition), by = "Barcode")
+  out <- bind_rows(m006, m007, m008)
+  colnames(out)[2] <- "Velocity"
+  out
+}
+
+velo_scale <- function(){
+  # z scales the velocity per sample
+  # and returns a huge tidy tibble
+  m006_l <- m006_velo %>% pivot_longer(-Barcode) %>% 
+    mutate(value = scale(value)) %>% 
+    left_join(combined@reductions$umap@cell.embeddings %>% as_tibble(rownames = 'Barcode'), by = "Barcode") %>% 
+    left_join(combined@meta.data %>% as_tibble(rownames = 'Barcode') %>% select(Barcode, cluster.condition), by = "Barcode")
+  m007_l <-  m007_velo %>% pivot_longer(-Barcode) %>% 
+    mutate(value = scale(value)) %>% 
+    left_join(combined@reductions$umap@cell.embeddings %>% as_tibble(rownames = 'Barcode'), by = "Barcode") %>% 
+    left_join(combined@meta.data %>% as_tibble(rownames = 'Barcode') %>% select(Barcode, cluster.condition), by = "Barcode")
+  m008_l <- m008_velo %>% pivot_longer(-Barcode) %>% 
+    mutate(value = scale(value)) %>% 
+    left_join(combined@reductions$umap@cell.embeddings %>% as_tibble(rownames = 'Barcode'), by = "Barcode") %>% 
+    left_join(combined@meta.data %>% as_tibble(rownames = 'Barcode') %>% select(Barcode, cluster.condition), by = "Barcode")
+  out <- bind_rows(m006_l, m007_l, m008_l) %>% data.frame()
+  colnames(out)[c(2,3)] <- c("Gene", "Velocity")
+  out 
+}
+velo_scale_df <- velo_scale()
+```
+
+
+# Plots
+```{r, fig.width = 4, fig.height = 2}
+genes <- c("NTRK3", "REEP5", "RBP3", "THRB", "MEIS2", "PRDM1", "ONECUT1", "TOX3", "SIX6", "OTX2", "FGFR3",  "TFAP2E")
+for (i in genes){
+  print( velo_scale_df %>% filter(Gene == i) %>%  ggplot(aes(x=UMAP_1, y = UMAP_2, color = Velocity)) + 
+           geom_point(size = 0.3) +  
+           cowplot::theme_cowplot() + scale_color_gradient2(
+             low = "green", 
+             high = "blue", 
+             mid = 'gray'
+           ) + 
+           facet_wrap(~cluster.condition) + 
+           ggtitle(i)
+  )
+}
+```
+
+
+```{r}
+devtools::session_info()
+```
