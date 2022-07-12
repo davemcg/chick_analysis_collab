@@ -1,0 +1,109 @@
+---
+title: "Miruna GT Chick Velocity Request List"
+author: David McGaughey
+date: 2022-02-18
+output: 
+  html_notebook:
+    theme: united
+---
+
+# Run Plotter
+```{python}
+genes = ['NTRK3', 'REEP5','RBP3','THRB','MEIS2','PRDM1','ONECUT1','TOX3','SIX6','OTX2','FGFR3','SEMA6D','TFAP2E']
+for prefix in ['WT', 'G15','G16']:
+  print(prefix)
+  if prefix == 'WT':
+    file = '/Users/mcgaugheyd/data/chick_miruna/m006_scVelo.h5ad'
+  if prefix == 'G15':
+    file = '/Users/mcgaugheyd/data/chick_miruna/m007_scVelo.h5ad'
+  if prefix == 'G16':
+    file = '/Users/mcgaugheyd/data/chick_miruna/m008_scVelo.h5ad'
+  adata = sc.read_h5ad(file)
+  for g in genes:
+    scv.pl.velocity(adata, [g], show = False, save = prefix +  '.' + g + '.png', dpi = 300, color ='seurat_clusters',  palette=color_palette)
+
+```
+
+Each set goes: WT, G15, G16
+
+# NTRK3
+
+![](figures/scvelo_WT.NTRK3.png)
+![](figures/scvelo_G15.NTRK3.png)
+![](figures/scvelo_G16.NTRK3.png)
+
+# REEP5
+
+![](figures/scvelo_WT.REEP5.png)
+![](figures/scvelo_G15.REEP5.png)
+![](figures/scvelo_G16.REEP5.png)
+
+# RBP3
+
+![](figures/scvelo_WT.RBP3.png)
+![](figures/scvelo_G15.RBP3.png)
+![](figures/scvelo_G16.RBP3.png)
+
+# THRB
+
+![](figures/scvelo_WT.THRB.png)
+![](figures/scvelo_G15.THRB.png)
+![](figures/scvelo_G16.THRB.png)
+
+# MEIS2
+
+![](figures/scvelo_WT.MEIS2.png)
+![](figures/scvelo_G15.MEIS2.png)
+![](figures/scvelo_G16.MEIS2.png)
+
+# PRDM1
+
+![](figures/scvelo_WT.PRDM1.png)
+![](figures/scvelo_G15.PRDM1.png)
+![](figures/scvelo_G16.PRDM1.png)
+
+# ONECUT1
+
+![](figures/scvelo_WT.ONECUT1.png)
+![](figures/scvelo_G15.ONECUT1.png)
+![](figures/scvelo_G16.ONECUT1.png)
+
+# TOX3
+
+![](figures/scvelo_WT.TOX3.png)
+![](figures/scvelo_G15.TOX3.png)
+![](figures/scvelo_G16.TOX3.png)
+
+# SIX6
+
+![](figures/scvelo_WT.SIX6.png)
+![](figures/scvelo_G15.SIX6.png)
+![](figures/scvelo_G16.SIX6.png)
+
+# OTX2
+
+![](figures/scvelo_WT.OTX2.png)
+![](figures/scvelo_G15.OTX2.png)
+![](figures/scvelo_G16.OTX2.png)
+
+# FGFR3
+
+![](figures/scvelo_WT.FGFR3.png)
+![](figures/scvelo_G15.FGFR3.png)
+![](figures/scvelo_G16.FGFR3.png)
+
+# SEMA6D
+
+![](figures/scvelo_WT.SEMA6D.png)
+![](figures/scvelo_G15.SEMA6D.png)
+![](figures/scvelo_G16.SEMA6D.png)
+
+# TFAP2E
+
+![](figures/scvelo_WT.TFAP2E.png)
+![](figures/scvelo_G15.TFAP2E.png)
+![](figures/scvelo_G16.TFAP2E.png)
+
+
+
+
