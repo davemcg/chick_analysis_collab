@@ -1,0 +1,131 @@
+---
+title: "Heatmap"
+output: html_notebook
+---
+
+# R load
+```{r}
+suppressPackageStartupMessages({
+    library("tidyverse")
+    library("reticulate")
+    library("ggplot2")
+    library("SingleCellExperiment")
+    library("scater")
+    library("Seurat")
+    library("SeuratDisk")
+    library("zellkonverter")
+  library(viridis)
+})
+# load('~/data/chick_miruna/08052021.RData')
+# save just combined to reduce load time from Miruna's entire environment
+# save(combined, file = '~/data/chick_miruna/combined_mgg_08052021.Rdata' )
+load('~/data/chick_miruna/combined_mgg_08052021.Rdata')
+combined
+
+color_palette <- pals::glasbey()[1:14]
+names(color_palette) <- seq(0,13, 1)
+```
+
+
+
+# Recolored your UMAPs
+```{r, fig.width=10, fig.height=3}
+DimPlot(combined, label = TRUE, label.box = TRUE, split.by = 'cluster.condition', pt.size = 1) + 
+  scale_color_manual(values = color_palette) + 
+  scale_fill_manual(values = alpha(rep('white', 14), 0.9))
+
+DimPlot(combined, split.by = 'cluster.condition',group.by = 'Phase' ) + scale_color_manual(values = pals::brewer.set2(5) %>% unname())
+```
+
+
+
+```{r}
+genes <- c('SALL1','SALL3','OPN1LW','RXRG','OTX2','THRB')
+counts <- combined@assays$RNA@counts[genes,]
+mat <- counts %>% as_tibble(rownames = 'Gene') %>% pivot_longer(-Gene, names_to = 'BC') %>% 
+  left_join(combined@meta.data %>% as_tibble(rownames = 'BC')) %>% 
+  filter(cluster.condition == 'Sall1 CTRL_Sall1 CTRL') %>% 
+  dplyr::select(Gene, BC, value) %>% 
+      pivot_wider(values_from = value, names_from = BC)
+
+
+row.names(mat) <- mat$Gene
+mat <- mat %>% data.frame()
+mat <- mat[,-1] 
+
+cluster <- colnames(mat) %>% as_tibble() %>% dplyr::select(BC = value) %>% left_join(combined@meta.data %>% as_tibble(rownames = 'BC') %>% mutate(BC = gsub('-','.', BC))) %>% pull(seurat_clusters) 
+
+
+
+
+a <- ComplexHeatmap::Heatmap(log2(mat+1), 
+                        col = viridis(10),
+                        column_split = cluster,
+                        cluster_columns = FALSE,
+                        show_column_names = FALSE,
+                        row_title = 'Control',
+                        name ='log2 (counts)')
+```
+
+
+
+```{r}
+counts <- combined@assays$RNA@counts[genes,]
+mat <- counts %>% as_tibble(rownames = 'Gene') %>% pivot_longer(-Gene, names_to = 'BC') %>% 
+  left_join(combined@meta.data %>% as_tibble(rownames = 'BC')) %>% 
+  filter(cluster.condition == 'Sall1 KO15_Sall1 KO15') %>% 
+  dplyr::select(Gene, BC, value) %>% 
+      pivot_wider(values_from = value, names_from = BC)
+
+
+row.names(mat) <- mat$Gene
+mat <- mat %>% data.frame()
+mat <- mat[,-1] 
+
+cluster <- colnames(mat) %>% as_tibble() %>% dplyr::select(BC = value) %>% left_join(combined@meta.data %>% as_tibble(rownames = 'BC') %>% mutate(BC = gsub('-','.', BC))) %>% pull(seurat_clusters) 
+
+library(viridis)
+
+
+b <- ComplexHeatmap::Heatmap(log2(mat+1), 
+                        col = viridis(10),
+                        column_split = cluster,
+                        cluster_columns = FALSE,
+                        show_column_names = FALSE,
+                        row_title = 'KO15',
+                        name ='log2 (counts)')
+```
+
+
+```{r}
+counts <- combined@assays$RNA@counts[genes,]
+mat <- counts %>% as_tibble(rownames = 'Gene') %>% pivot_longer(-Gene, names_to = 'BC') %>% 
+  left_join(combined@meta.data %>% as_tibble(rownames = 'BC'), by = 'BC') %>% 
+  filter(cluster.condition == 'Sall1 KO16_Sall1 KO16') %>% 
+  dplyr::select(Gene, BC, value) %>% 
+      pivot_wider(values_from = value, names_from = BC)
+
+
+row.names(mat) <- mat$Gene
+mat <- mat %>% data.frame()
+mat <- mat[,-1] 
+
+cluster <- colnames(mat) %>% as_tibble() %>% dplyr::select(BC = value) %>% left_join(combined@meta.data %>% as_tibble(rownames = 'BC') %>% mutate(BC = gsub('-','.', BC))) %>% pull(seurat_clusters) 
+
+library(viridis)
+
+
+c <- ComplexHeatmap::Heatmap(log2(mat+1), 
+                        col = viridis(10),
+                        column_split = cluster,
+                        cluster_columns = FALSE,
+                        show_column_names = FALSE,
+                        row_title = 'KO16',
+                        name ='log2 (counts)')
+```
+
+
+```{r, fig.width=20, fig.height=4}
+
+a + b + c
+```
