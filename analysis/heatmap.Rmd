@@ -1,5 +1,5 @@
 ---
-title: "Heatmap"
+title: "Heatmaps"
 output: html_notebook
 ---
 
@@ -28,19 +28,9 @@ names(color_palette) <- seq(0,13, 1)
 
 
 
-# Recolored your UMAPs
-```{r, fig.width=10, fig.height=3}
-DimPlot(combined, label = TRUE, label.box = TRUE, split.by = 'cluster.condition', pt.size = 1) + 
-  scale_color_manual(values = color_palette) + 
-  scale_fill_manual(values = alpha(rep('white', 14), 0.9))
 
-DimPlot(combined, split.by = 'cluster.condition',group.by = 'Phase' ) + scale_color_manual(values = pals::brewer.set2(5) %>% unname())
-```
-
-
-
-```{r}
-genes <- c('SALL1','SALL3','OPN1LW','RXRG','OTX2','THRB')
+```{r, fig.width=9, fig.height=2}
+genes <- c('SALL1','SALL3','OPN1LW','RXRG','OTX2','THRB', 'ONECUT1','ONECUT2')
 counts <- combined@assays$RNA@counts[genes,]
 mat <- counts %>% as_tibble(rownames = 'Gene') %>% pivot_longer(-Gene, names_to = 'BC') %>% 
   left_join(combined@meta.data %>% as_tibble(rownames = 'BC')) %>% 
@@ -56,20 +46,25 @@ mat <- mat[,-1]
 cluster <- colnames(mat) %>% as_tibble() %>% dplyr::select(BC = value) %>% left_join(combined@meta.data %>% as_tibble(rownames = 'BC') %>% mutate(BC = gsub('-','.', BC))) %>% pull(seurat_clusters) 
 
 
+conversion <- cbind(seq(0,13,1), c('PR2','PR3','restrRPC2','multiRPC1','trAC_HC','HC1','PR1','hdPR1','HC2','multiRPC2','hdPR2','hdPR3','RGC','restrRPC1')) %>% 
+  as_tibble()
 
+cluster2 <- cluster %>% enframe() %>% left_join(conversion, by = c('value' = 'V1')) %>% pull(V2)
 
 a <- ComplexHeatmap::Heatmap(log2(mat+1), 
                         col = viridis(10),
-                        column_split = cluster,
+                        column_split = cluster2,
                         cluster_columns = FALSE,
                         show_column_names = FALSE,
                         row_title = 'Control',
                         name ='log2 (counts)')
+a
+
 ```
 
 
 
-```{r}
+```{r, fig.width=9, fig.height=2}
 counts <- combined@assays$RNA@counts[genes,]
 mat <- counts %>% as_tibble(rownames = 'Gene') %>% pivot_longer(-Gene, names_to = 'BC') %>% 
   left_join(combined@meta.data %>% as_tibble(rownames = 'BC')) %>% 
@@ -84,20 +79,20 @@ mat <- mat[,-1]
 
 cluster <- colnames(mat) %>% as_tibble() %>% dplyr::select(BC = value) %>% left_join(combined@meta.data %>% as_tibble(rownames = 'BC') %>% mutate(BC = gsub('-','.', BC))) %>% pull(seurat_clusters) 
 
-library(viridis)
-
+cluster2 <- cluster %>% enframe() %>% left_join(conversion, by = c('value' = 'V1')) %>% pull(V2)
 
 b <- ComplexHeatmap::Heatmap(log2(mat+1), 
                         col = viridis(10),
-                        column_split = cluster,
+                        column_split = cluster2,
                         cluster_columns = FALSE,
                         show_column_names = FALSE,
                         row_title = 'KO15',
                         name ='log2 (counts)')
+b
 ```
 
 
-```{r}
+```{r, fig.width=9, fig.height=2}
 counts <- combined@assays$RNA@counts[genes,]
 mat <- counts %>% as_tibble(rownames = 'Gene') %>% pivot_longer(-Gene, names_to = 'BC') %>% 
   left_join(combined@meta.data %>% as_tibble(rownames = 'BC'), by = 'BC') %>% 
@@ -112,20 +107,16 @@ mat <- mat[,-1]
 
 cluster <- colnames(mat) %>% as_tibble() %>% dplyr::select(BC = value) %>% left_join(combined@meta.data %>% as_tibble(rownames = 'BC') %>% mutate(BC = gsub('-','.', BC))) %>% pull(seurat_clusters) 
 
-library(viridis)
-
+cluster2 <- cluster %>% enframe() %>% left_join(conversion, by = c('value' = 'V1')) %>% pull(V2)
 
 c <- ComplexHeatmap::Heatmap(log2(mat+1), 
                         col = viridis(10),
-                        column_split = cluster,
+                        column_split = cluster2,
                         cluster_columns = FALSE,
                         show_column_names = FALSE,
                         row_title = 'KO16',
                         name ='log2 (counts)')
+c
 ```
 
 
-```{r, fig.width=20, fig.height=4}
-
-a + b + c
-```
